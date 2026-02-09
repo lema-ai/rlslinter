@@ -1,4 +1,4 @@
-module github.com/lema.ai/lemmata/tools/gormlinter
+module github.com/lema-ai/rlslinter
 
 go 1.25.4
 
