@@ -12,18 +12,18 @@ func init() {
 
 // New creates a new instance of the gormlinter plugin
 func New(settings any) (register.LinterPlugin, error) {
-	return &GormLinter{}, nil
+	return &RLSLinter{}, nil
 }
 
-// GormLinter implements the LinterPlugin interface
-type GormLinter struct{}
+// RLSLinter implements the LinterPlugin interface
+type RLSLinter struct{}
 
 // BuildAnalyzers returns the analyzers provided by this linter
-func (l *GormLinter) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+func (l *RLSLinter) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 	return []*analysis.Analyzer{analyzer.Analyzer}, nil
 }
 
 // GetLoadMode returns the load mode required by this linter
-func (l *GormLinter) GetLoadMode() string {
+func (l *RLSLinter) GetLoadMode() string {
 	return register.LoadModeTypesInfo
 }

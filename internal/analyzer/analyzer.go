@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"log"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -12,19 +11,15 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-const Doc = `gormlinter detects unsupported GORM methods that fail with the org-wrapping transaction system.
+const Doc = `rlslinter detects unsupported GORM methods that fail with the org-wrapping transaction system.
 
-The GORM wrapper automatically wraps queries in transactions and commits them immediately.
-This breaks methods that return data to be read after the transaction closes:
-- .Row() - Returns a single row
-- .Rows() - Returns an iterator over rows
-- .Scan() - Scans results into a variable
-
-Use .Find(), .First(), or .Pluck() instead.
+The lemmata GORM wrapper automatically wraps queries in transactions and commits them immediately.
+This breaks methods that return data to be read after the transaction closes, causing
+Row-Level Security (RLS) to fail and potentially returning empty or incorrect results.
 `
 
 var Analyzer = &analysis.Analyzer{
-	Name:     "gormlinter",
+	Name:     "rlslinter",
 	Doc:      Doc,
 	Run:      run,
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
@@ -32,22 +27,56 @@ var Analyzer = &analysis.Analyzer{
 
 var prohibitedMethods = map[string]methodInfo{
 	"Row": {
-		message:     "GORM .Row() is not supported due to transaction auto-commit",
+		message:     "GORM .Row() is not supported - data accessed after transaction closes",
 		replacement: "Use .First() or .Find() instead",
+		explanation: `
+Why this fails:
+  • The GORM wrapper commits transactions immediately after query execution
+  • .Row() returns data to be read AFTER the transaction closes
+  • app.current_org_id is no longer set when data is accessed
+  • Row-Level Security (RLS) won't filter by organization
+  • Queries on org tables may return EMPTY results or data from wrong org
+
+To suppress (ONLY if querying non-org tables):
+  //nolint:rlslinter // Not querying org tables
+  row := db.Row()`,
 	},
 	"Rows": {
-		message:     "GORM .Rows() is not supported due to transaction auto-commit",
+		message:     "GORM .Rows() is not supported - data accessed after transaction closes",
 		replacement: "Use .Find() to retrieve multiple records",
+		explanation: `
+Why this fails:
+  • The GORM wrapper commits transactions immediately after query execution
+  • .Rows() returns data to be read AFTER the transaction closes
+  • app.current_org_id is no longer set when data is accessed
+  • Row-Level Security (RLS) won't filter by organization
+  • Queries on org tables may return EMPTY results or data from wrong org
+
+To suppress (ONLY if querying non-org tables):
+  //nolint:rlslinter // Not querying org tables
+  rows, _ := db.Rows()`,
 	},
 	"Scan": {
-		message:     "GORM .Scan() is not supported due to transaction auto-commit",
+		message:     "GORM .Scan() is not supported - data accessed after transaction closes",
 		replacement: "Use .Pluck() for single column or .Find() for multiple columns",
+		explanation: `
+Why this fails:
+  • The GORM wrapper commits transactions immediately after query execution
+  • .Scan() returns data to be read AFTER the transaction closes
+  • app.current_org_id is no longer set when data is accessed
+  • Row-Level Security (RLS) won't filter by organization
+  • Queries on org tables may return EMPTY results or data from wrong org
+
+To suppress (ONLY if querying non-org tables):
+  //nolint:rlslinter // Not querying org tables
+  db.Scan(&result)`,
 	},
 }
 
 type methodInfo struct {
 	message     string
 	replacement string
+	explanation string
 }
 
 func run(pass *analysis.Pass) (any, error) {
@@ -67,7 +96,6 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 
 		methodName := selector.Sel.Name
-		log.Println("methodName", methodName)
 
 		// Check if method is in our prohibited list
 		methodDetails, isProhibited := prohibitedMethods[methodName]
@@ -120,7 +148,8 @@ func isGormType(info *types.Info, expr ast.Expr) bool {
 	// Check if it's from GORM or generated GORM queries
 	return pkgPath == "gorm.io/gorm" ||
 		pkgPath == "gorm.io/gorm/clause" ||
-		strings.HasPrefix(pkgPath, "github.com/lema.ai/lemmata/db/gorm/query")
+		strings.HasPrefix(pkgPath, "github.com/lema.ai/lemmata/db/gorm") ||
+		strings.HasPrefix(pkgPath, "github.com/lema-ai/lemmata/db/gorm")
 }
 
 // hasSuppression checks if there's a nolint comment suppressing this linter
@@ -141,9 +170,8 @@ func hasSuppression(pass *analysis.Pass, node ast.Node) bool {
 			// Check if comment is on the same line or line above
 			if commentLine == line || commentLine == line-1 {
 				text := comment.Text
-				// Check for //nolint:gormlinter or //nolint
-				if strings.Contains(text, "nolint:gormlinter") ||
-					strings.Contains(text, "nolint") && !strings.Contains(text, "nolint:") {
+				// Check for //nolint:rlslinter or //nolint
+				if strings.Contains(text, "nolint:rlslinter"); strings.Contains(text, "nolint") && !strings.Contains(text, "nolint:") {
 					return true
 				}
 			}
@@ -165,9 +193,8 @@ func reportIssue(pass *analysis.Pass, callExpr *ast.CallExpr, methodName string,
 	end = selector.Sel.End()
 
 	message := info.message + "\n" +
-		info.replacement + "\n\n" +
-		"The GORM wrapper commits transactions immediately after queries execute.\n" +
-		"See: /services/internal/database/postgres/gormwrapper.go"
+		info.replacement + "\n" +
+		info.explanation
 
 	pass.Report(analysis.Diagnostic{
 		Pos:     pos,
