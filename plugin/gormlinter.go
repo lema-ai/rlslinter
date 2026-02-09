@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	register.Plugin("gormlinter", New)
+	register.Plugin("rlslinter", New)
 }
 
 // New creates a new instance of the gormlinter plugin
