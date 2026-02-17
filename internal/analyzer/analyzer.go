@@ -67,6 +67,11 @@ Why this fails:
   • Row-Level Security (RLS) won't filter by organization
   • Queries on org tables may return EMPTY results or data from wrong org
 
+If replacing with UnderlyingDB().Find() or UnderlyingDB().Pluck():
+  • Pass a typed model destination (&[]MyModel{} or .Model(&MyModel{})) so GORM
+    can derive the DeletedAt scope — otherwise soft-deleted records will be returned
+  • NEVER use UnderlyingDB().Table("name") — it bypasses the model schema entirely
+
 To suppress (ONLY if querying non-org tables):
   //nolint:rlslinter // Not querying org tables
   db.Scan(&result)`,
@@ -171,7 +176,7 @@ func hasSuppression(pass *analysis.Pass, node ast.Node) bool {
 			if commentLine == line || commentLine == line-1 {
 				text := comment.Text
 				// Check for //nolint:rlslinter or //nolint
-				if strings.Contains(text, "nolint:rlslinter"); strings.Contains(text, "nolint") && !strings.Contains(text, "nolint:") {
+				if strings.Contains(text, "nolint:rlslinter") || (strings.Contains(text, "nolint") && !strings.Contains(text, "nolint:")) {
 					return true
 				}
 			}

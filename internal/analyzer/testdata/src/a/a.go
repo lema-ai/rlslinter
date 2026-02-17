@@ -6,28 +6,28 @@ import (
 
 // Test case 1: GORM .Row() should be flagged
 func testRow(db *gorm.DB) {
-	db.Row() // want "GORM .Row\\(\\) is not supported due to transaction auto-commit"
+	db.Row() // want "GORM .Row\\(\\) is not supported"
 }
 
 // Test case 2: GORM .Rows() should be flagged
 func testRows(db *gorm.DB) {
-	db.Rows() // want "GORM .Rows\\(\\) is not supported due to transaction auto-commit"
+	db.Rows() // want "GORM .Rows\\(\\) is not supported"
 }
 
 // Test case 3: GORM .Scan() should be flagged
 func testScan(db *gorm.DB) {
 	var result string
-	db.Scan(&result) // want "GORM .Scan\\(\\) is not supported due to transaction auto-commit"
+	db.Scan(&result) // want "GORM .Scan\\(\\) is not supported"
 }
 
 // Test case 4: Chained GORM .Row() should be flagged
 func testChainedRow(db *gorm.DB) {
-	db.Where("id = ?", 1).Row() // want "GORM .Row\\(\\) is not supported due to transaction auto-commit"
+	db.Where("id = ?", 1).Row() // want "GORM .Row\\(\\) is not supported"
 }
 
-// Test case 5: Suppression with nolint:gormlinter should NOT be flagged
+// Test case 5: Suppression with nolint:rlslinter should NOT be flagged
 func testSuppressionSpecific(db *gorm.DB) {
-	//nolint:gormlinter
+	//nolint:rlslinter
 	db.Row()
 }
 
@@ -39,7 +39,7 @@ func testSuppressionGeneric(db *gorm.DB) {
 
 // Test case 7: Inline suppression should NOT be flagged
 func testSuppressionInline(db *gorm.DB) {
-	db.Scan(&struct{}{}) //nolint:gormlinter
+	db.Scan(&struct{}{}) //nolint:rlslinter
 }
 
 // ExcelFile simulates excelize.File to test false positives
@@ -65,7 +65,5 @@ func (p *Platform) Scan(value interface{}) error {
 // Test case 10: Non-GORM .Scan() should NOT be flagged
 func testNonGormScan() {
 	var p Platform
-	// This would be calling database/sql's Scan, not GORM's
-	// In real code this would be rows.Scan(&p), but we're simulating
 	_ = p.Scan("test") // Should NOT be flagged - calling Platform.Scan, not gorm.DB.Scan
 }

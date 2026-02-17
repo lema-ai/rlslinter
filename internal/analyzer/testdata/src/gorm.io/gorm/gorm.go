@@ -22,3 +22,28 @@ func (db *DB) Scan(dest interface{}) *DB {
 func (db *DB) Where(query interface{}, args ...interface{}) *DB {
 	return db
 }
+
+// Table is a stub method
+func (db *DB) Table(name string, args ...interface{}) *DB {
+	return db
+}
+
+// Model is a stub method
+func (db *DB) Model(value interface{}) *DB {
+	return db
+}
+
+// Find is a stub method
+func (db *DB) Find(dest interface{}, conds ...interface{}) *DB {
+	return db
+}
+
+// Pluck is a stub method
+func (db *DB) Pluck(column string, dest interface{}) *DB {
+	return db
+}
+
+// UnderlyingDB is a stub method
+func (db *DB) UnderlyingDB() *DB {
+	return db
+}
